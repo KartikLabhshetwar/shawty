@@ -24,10 +24,11 @@ export default function HomePage() {
     setShortenedUrl("") // Clear previous shortened URL
     setError(null) // Clear previous error
 
-    const URL = "https://shawty-62a4.onrender.com/shorten"
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080/shorten";
+    const shortenEndpoint = `${apiBaseUrl}/shorten`;
 
     try {
-      const response = await fetch(URL, {
+      const response = await fetch(shortenEndpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
