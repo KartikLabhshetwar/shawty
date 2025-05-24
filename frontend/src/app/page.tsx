@@ -24,7 +24,7 @@ export default function HomePage() {
     setShortenedUrl("") // Clear previous shortened URL
     setError(null) // Clear previous error
 
-    const URL = "http://localhost:8080/shorten"
+    const URL = "https://shawty-62a4.onrender.com/shorten"
 
     try {
       const response = await fetch(URL, {
