@@ -95,9 +95,15 @@ func main() {
 // corsMiddleware adds necessary CORS headers to each request.
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Set allowed origin. For production, you might want to make this configurable
-		// and more restrictive than "*". For development, "http://localhost:3000" is specific.
-		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+		allowedOrigins := []string{"http://localhost:3000", "https://shawty-jet.vercel.app"}
+		requestOrigin := r.Header.Get("Origin")
+
+		for _, origin := range allowedOrigins {
+			if requestOrigin == origin {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+				break
+			}
+		}
 
 		// Set allowed methods
 		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
