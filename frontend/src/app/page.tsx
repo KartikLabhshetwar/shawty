@@ -24,8 +24,10 @@ export default function HomePage() {
     setShortenedUrl("") // Clear previous shortened URL
     setError(null) // Clear previous error
 
+    const URL = "http://localhost:8080/shorten"
+
     try {
-      const response = await fetch("http://localhost:8080/shorten", {
+      const response = await fetch(URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
