@@ -12,6 +12,9 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
+// ErrDuplicateShortID is returned when trying to save a URL with a short ID that already exists.
+var ErrDuplicateShortID = errors.New("short ID already exists in store")
+
 // UrlStoreInterface defines the operations for URL persistence.
 type UrlStoreInterface interface {
 	Save(ctx context.Context, urlEntry domain.URL) error
@@ -67,9 +70,8 @@ func (s *MongoUrlStore) EnsureIndexes(ctx context.Context) error {
 func (s *MongoUrlStore) Save(ctx context.Context, urlEntry domain.URL) error {
 	_, err := s.collection.InsertOne(ctx, urlEntry)
 	if err != nil {
-		// Check for duplicate key error (code 11000)
 		if mongo.IsDuplicateKeyError(err) {
-			return fmt.Errorf("short URL '%s' already exists: %w", urlEntry.ID, err)
+			return ErrDuplicateShortID
 		}
 		return fmt.Errorf("failed to insert URL into MongoDB: %w", err)
 	}

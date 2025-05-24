@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -72,9 +73,13 @@ func (h *URLHandler) shortenURLHandler(w http.ResponseWriter, r *http.Request) {
 	createdURL, err := h.urlService.CreateShortURL(r.Context(), req.URL)
 	if err != nil {
 		log.Printf("Error creating short URL for '%s': %v", req.URL, err)
-		// Check for specific error types, e.g., if it's a duplicate
-		if strings.Contains(err.Error(), "already exists") {
-			http.Error(w, "This URL has already been shortened or a hash collision occurred.", http.StatusConflict)
+
+		if errors.Is(err, service.ErrHashCollision) {
+			http.Error(w, "Failed to create short URL due to a hash collision. Please try again or modify the URL slightly.", http.StatusConflict)
+		} else if strings.Contains(err.Error(), "duplicate") || strings.Contains(err.Error(), "already exists") {
+			// This case should ideally be less frequent now if service.CreateShortURL handles known duplicates by returning the existing URL.
+			// This might catch other unexpected duplicate errors or if ErrDuplicateShortID from store somehow propagates directly.
+			http.Error(w, "This URL may have already been shortened or a conflict occurred.", http.StatusConflict)
 		} else {
 			http.Error(w, "Failed to create short URL", http.StatusInternalServerError)
 		}

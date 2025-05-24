@@ -4,12 +4,16 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"time"
 
 	"shawty/internal/domain"
 	"shawty/internal/store"
 )
+
+// ErrHashCollision is returned when two different original URLs generate the same short ID.
+var ErrHashCollision = errors.New("hash collision detected")
 
 // UrlServiceInterface defines operations for URL management.
 type UrlServiceInterface interface {
@@ -38,6 +42,8 @@ func generateShortID(originalURL string) string {
 }
 
 // CreateShortURL generates a short URL for the given original URL and saves it.
+// If the original URL has already been shortened, it returns the existing short URL.
+// It returns ErrHashCollision if a different original URL generates the same short ID.
 func (s *UrlService) CreateShortURL(ctx context.Context, originalURL string) (domain.URL, error) {
 	if originalURL == "" {
 		return domain.URL{}, fmt.Errorf("original URL cannot be empty")
@@ -45,21 +51,38 @@ func (s *UrlService) CreateShortURL(ctx context.Context, originalURL string) (do
 
 	shortID := generateShortID(originalURL)
 
-	urlEntry := domain.URL{
-		ID:           shortID, // Using generated shortID as the MongoDB _id
+	urlToSave := domain.URL{
+		ID:           shortID,
 		OriginalUrl:  originalURL,
-		ShortUrl:     shortID, // Storing shortID also in ShortUrl field for clarity/flexibility
+		ShortUrl:     shortID,
 		CreationDate: time.Now().UTC(),
 	}
 
-	err := s.urlStore.Save(ctx, urlEntry)
-	if err != nil {
-		// If it's a duplicate key error, we might want to fetch the existing one
-		// or return a specific error indicating duplication.
-		// For now, just propagate the error.
-		return domain.URL{}, fmt.Errorf("failed to save URL: %w", err)
+	err := s.urlStore.Save(ctx, urlToSave)
+	if err == nil {
+		// Successfully saved a new entry
+		return urlToSave, nil
 	}
-	return urlEntry, nil
+
+	// Handle error from Save
+	if errors.Is(err, store.ErrDuplicateShortID) {
+		// The shortID already exists, fetch the existing entry
+		existingURL, getErr := s.urlStore.GetByShortID(ctx, shortID)
+		if getErr == nil {
+			// Successfully fetched the existing URL
+			if existingURL.OriginalUrl == originalURL {
+				// The original URLs match, so this is the same URL being submitted again
+				return existingURL, nil
+			}
+			// Original URLs do not match: this is a hash collision
+			return domain.URL{}, fmt.Errorf("%w: short ID '%s' generated for a different original URL (submitted: '%s', existing: '%s')", ErrHashCollision, shortID, originalURL, existingURL.OriginalUrl)
+		}
+		// Error fetching the existing URL after duplicate detection
+		return domain.URL{}, fmt.Errorf("error retrieving existing URL for short ID '%s' after duplicate detection: %w", shortID, getErr)
+	}
+
+	// Some other error occurred during save
+	return domain.URL{}, fmt.Errorf("failed to save URL: %w", err)
 }
 
 // GetOriginalURL retrieves the original URL for a given short ID.
